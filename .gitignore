@@ -1,1 +1,4 @@
 venv
+EMOTION_DETECTION/static
+EMOTION_DETECTION/__pycache__
+EMOTION_DETECTION/main.py
