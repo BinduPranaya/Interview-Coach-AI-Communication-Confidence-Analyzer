@@ -1,12 +1,16 @@
 import os
 import sys
+import uvicorn
 from pathlib import Path
-from groq import Groq
+from groq import Groq, GroqError
 from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 # --- Configuration & Initialization ---
 
-# 1. Load environment variables from a .env file (if present)
+# 1. Load environment variables from .env file
 load_dotenv()
 
 # 2. Safely get the API Key and ensure it exists
@@ -22,54 +26,87 @@ except Exception as e:
     print(f"❌ ERROR: Could not initialize Groq client: {e}", file=sys.stderr)
     sys.exit(1)
 
-# Define file paths and constants
-# Use a more descriptive file name and place it in the same directory as the script
-OUTPUT_FILENAME = "synthesized_speech.wav"
-# Path(_file_).parent gets the directory of the current script
-output_file_path = Path(__file__).parent / OUTPUT_FILENAME
-
-# TTS Model and Voice
+# 4. Define TTS constants
 TTS_MODEL = "playai-tts"
-TTS_VOICE = "Aaliyah-PlayAI"
-RESPONSE_FORMAT = "wav" # Groq API defaults to 'mp3', but 'wav' is requested here
+# Note: The Groq API only supports 'mp3', 'wav', 'pcm', 'flac'
+# Let's default to mp3 as it's more common, but allow 'wav'
+DEFAULT_RESPONSE_FORMAT = "mp3" 
 
-# --- Main Logic ---
+# 5. Initialize FastAPI app
+app = FastAPI(
+    title="Groq TTS API",
+    description="A simple API to proxy text-to-speech requests to the Groq API.",
+    version="1.0.0"
+)
 
-def synthesize_text_to_speech():
-    """Prompts the user for text, calls the Groq TTS API, and saves the audio."""
+# --- API Models ---
+
+class TTSRequest(BaseModel):
+    """Defines the JSON body for a /synthesize request."""
+    text: str
+    voice: str = "Aaliyah-PlayAI" # Default voice, can be overridden
+    format: str = DEFAULT_RESPONSE_FORMAT # Default format, can be 'wav', 'pcm', etc.
+
+# --- API Endpoints ---
+
+@app.get("/", summary="Root/Health Check")
+async def read_root():
+    """Simple health check endpoint."""
+    return {"status": "ok", "message": "Groq TTS API is running."}
+
+@app.post("/synthesize/", 
+          summary="Synthesize Speech",
+          description="Takes text and returns streaming audio data.")
+async def create_synthesis(request: TTSRequest):
+    """
+    Handles the POST request to /synthesize/.
+    - Takes a JSON body with "text", "voice", and "format".
+    - Calls the Groq API.
+    - Streams the audio response back.
+    """
+    if not request.text.strip():
+        raise HTTPException(status_code=400, detail="Input text cannot be empty.")
+
+    print(f"✨ Received request for voice: {request.voice}, format: {request.format}")
+    print(f'   -> Input: "{request.text[:50]}..."') # Log first 50 chars
+
     try:
-        # Get input from the user
-        text_input = input("🗣 Enter text to synthesize: ").strip()
-
-        if not text_input:
-            print("🛑 Input cannot be empty. Exiting.")
-            return
-
-        print(f"\n✨ Generating speech with {TTS_VOICE} via {TTS_MODEL}...")
-        print(f'   -> Input: "{text_input}"')
-        
         # 4. API Call
+        # Note: The Groq client's 'create' method returns a streaming-capable object
         response = client.audio.speech.create(
-          model=TTS_MODEL,
-          voice=TTS_VOICE,
-          response_format=RESPONSE_FORMAT,
-          input=text_input
+            model=TTS_MODEL,
+            voice=request.voice,
+            response_format=request.format,
+            input=request.text
         )
 
-        # 5. File Writing and Success Message
-        print(f"💾 Saving audio to {output_file_path}...")
-        response.write_to_file(output_file_path)
-        
-        print("\n✅ Success!")
-        print(f"   The synthesized speech has been saved to: *{output_file_path.resolve()}*")
+        # 5. Stream the audio response
+        # We use iter_bytes() which is a generator, perfect for StreamingResponse
+        return StreamingResponse(
+            response.iter_bytes(),
+            media_type=f"audio/{request.format}"
+        )
 
-    except Exception as e:
-        # 6. Comprehensive Error Handling
-        print(f"\n❌ An error occurred during synthesis or file writing: {e}", file=sys.stderr)
-        if hasattr(e, 'status_code') and e.status_code == 401:
-             print("   -> Check if your GROQ_API_KEY is valid.", file=sys.stderr)
+    except GroqError as e:
+        # Handle specific Groq API errors
+        print(f"\n❌ Groq API Error: {e}", file=sys.stderr)
+        status_code = e.status_code if hasattr(e, 'status_code') else 500
+        detail = f"Groq API error: {e.message or str(e)}"
+        if status_code == 401:
+            detail = "Authentication failed. Check your GROQ_API_KEY."
         elif 'rate limit' in str(e).lower():
-             print("   -> You may have hit a rate limit. Try again shortly.", file=sys.stderr)
+            detail = "You may have hit a rate limit. Try again shortly."
+        raise HTTPException(status_code=status_code, detail=detail)
+        
+    except Exception as e:
+        # Handle other unexpected errors
+        print(f"\n❌ An unexpected error occurred: {e}", file=sys.stderr)
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
+# --- Server Execution ---
 
 if __name__ == "__main__":
-    synthesize_text_to_speech()
+    """Run the FastAPI server using uvicorn."""
+    # print("🚀 Starting FastAPI server at http://127.0.0.1:8000")
+    # print("   -> Access API docs at http://127.0.0.1:8000/docs")
+    uvicorn.run(app, host="127.0.0.1", port=8000)
