@@ -1,0 +1,5 @@
+Tell me about yourself.
+What is your greatest strength?
+Explain a time you solved a challenging problem.
+How do you handle tight deadlines?
+Describe your experience with APIs.
