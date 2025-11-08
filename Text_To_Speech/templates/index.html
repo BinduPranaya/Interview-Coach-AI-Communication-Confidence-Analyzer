@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FastAPI TTS</title>
+
+  <style>
+    body {
+      background: #0f0f0f;
+      font-family: 'Poppins', sans-serif;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      width: 400px;
+      background: #1a1a1a;
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.4);
+      text-align: center;
+    }
+
+    h1 {
+      color: #00b7ff;
+      margin-bottom: 20px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 120px;
+      border: none;
+      border-radius: 10px;
+      background: #2a2a2a;
+      color: white;
+      font-size: 15px;
+      padding: 10px;
+      resize: none;
+      outline: none;
+    }
+
+    button {
+      margin-top: 15px;
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      background: #00b7ff;
+      color: #000;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    button:hover {
+      background: #0099dd;
+    }
+
+    #loader {
+      display: none;
+      margin-top: 15px;
+      color: #aaa;
+      font-size: 14px;
+      animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.3; }
+      50% { opacity: 1; }
+      100% { opacity: 0.3; }
+    }
+
+    #player {
+      margin-top: 20px;
+      width: 100%;
+      outline: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>🎤 FastAPI TTS</h1>
+    <textarea id="text" placeholder="Type something to speak..."></textarea>
+    <button id="speakBtn">Speak</button>
+    <div id="loader">🎧 Generating speech...</div>
+    <audio id="player" controls hidden></audio>
+  </div>
+
+  <script>
+    const speakBtn = document.getElementById("speakBtn");
+    const textInput = document.getElementById("text");
+    const loader = document.getElementById("loader");
+    const player = document.getElementById("player");
+
+    async function speak() {
+      const text = textInput.value.trim();
+      if (!text) {
+        alert("Please enter text!");
+        return;
+      }
+
+      loader.style.display = "block";
+      player.hidden = true;
+
+      try {
+        // JSON body for backend
+        const response = await fetch("/api/speak", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            text: text,
+            format: "mp3",
+            rate: 160
+          })
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          alert("Error: " + (err.detail || response.statusText));
+          loader.style.display = "none";
+          return;
+        }
+
+        // Convert binary audio data to Blob and play it
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        player.src = url;
+        player.hidden = false;
+        loader.style.display = "none";
+
+        // Auto-play the audio
+        await player.play();
+
+      } catch (err) {
+        console.error("Error:", err);
+        alert("Error generating or playing speech!");
+        loader.style.display = "none";
+      }
+    }
+
+    speakBtn.addEventListener("click", speak);
+
+    // Trigger speech with Enter key (Shift+Enter for newline)
+    textInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        speak();
+      }
+    });
+  </script>
+</body>
+</html>
