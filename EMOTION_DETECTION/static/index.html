@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Emotion Analyzer</title>
+    
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 20px; 
+            background-color: #f4f4f9; 
+            color: #333;
+        }
+        #video-container { 
+            margin-bottom: 20px; 
+            border: 2px solid #6c757d; 
+            border-radius: 8px; 
+            overflow: hidden; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        #videoElement { 
+            width: 640px; 
+            height: 480px; 
+            background-color: #000; 
+            display: block; 
+        }
+        #controls { 
+            margin-bottom: 20px; 
+            display: flex; 
+            gap: 15px;
+        }
+        button { 
+            padding: 12px 25px; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 16px; 
+            font-weight: bold;
+            transition: background-color 0.3s, transform 0.1s; 
+        }
+        button:hover {
+            transform: translateY(-1px);
+        }
+        #startButton { 
+            background-color: #28a745; 
+            color: white; 
+        }
+        #stopButton { 
+            background-color: #dc3545; 
+            color: white; 
+        }
+        #status { 
+            font-weight: bold; 
+            margin-bottom: 15px; 
+            color: #007bff; 
+        }
+        #result-summary { 
+            margin-top: 30px; 
+            width: 640px; 
+            background-color: white; 
+            padding: 25px; 
+            border-radius: 10px; 
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15); 
+            display: none; /* Initially hidden */
+        }
+        #chart-container { 
+            width: 100%; 
+            height: 350px; 
+            margin-bottom: 20px; 
+        }
+        h2 { 
+            border-bottom: 2px solid #eee; 
+            padding-bottom: 10px; 
+            margin-top: 0; 
+            color: #333;
+        }
+        #feedback-text {
+            white-space: pre-line; /* Respects line breaks from JS */
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+            font-family: monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+    </style>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <h1>🧠 Webcam Emotion Interview Analyzer</h1>
+    <p id="status">Ready to start analysis. **Ensure FastAPI is running on http://127.0.0.1:8000**</p>
+
+    <div id="video-container">
+        <video id="videoElement" autoplay muted></video>
+    </div>
+
+    <div id="controls">
+        <button id="startButton">▶️ Start Analysis</button>
+        <button id="stopButton" disabled>🛑 Stop Analysis</button>
+    </div>
+
+    <div id="result-summary">
+        <h2>📊 Analysis Summary</h2>
+        <div id="chart-container">
+            <canvas id="emotionChart"></canvas>
+        </div>
+        <h3>📝 Behavioral Feedback</h3>
+        <pre id="feedback-text">Analysis results will appear here after stopping the video stream.</pre>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:8000/predict_emotion/'; 
+        const video = document.getElementById('videoElement');
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
+        const statusText = document.getElementById('status');
+        const resultSummary = document.getElementById('result-summary');
+        const feedbackText = document.getElementById('feedback-text');
+        const canvas = document.getElementById('emotionChart');
+
+        let stream = null;
+        let intervalId = null;
+        let allPredictions = [];
+        let chartInstance = null;
+        const FRAME_INTERVAL_MS = 250; // Controls how often a frame is sent to the API (4 times per second)
+
+        /** Initializes webcam and starts streaming. */
+        async function startWebcam() {
+            try {
+                // Request access to the user's camera
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                video.play();
+                
+                startButton.disabled = true;
+                stopButton.disabled = false;
+                statusText.textContent = "Status: Capturing video and sending frames for analysis...";
+                
+                allPredictions = [];
+                resultSummary.style.display = 'none';
+
+                startAnalysisInterval();
+
+            } catch (err) {
+                console.error("Error accessing webcam: ", err);
+                statusText.textContent = "🔴 Error: Could not access webcam. Please check permissions and device connection.";
+            }
+        }
+
+        /** Starts the periodic sending of frames to the API. */
+        function startAnalysisInterval() {
+            const tempCanvas = document.createElement('canvas');
+            const tempContext = tempCanvas.getContext('2d');
+
+            intervalId = setInterval(() => {
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    // Set canvas size and draw the current video frame
+                    tempCanvas.width = video.videoWidth;
+                    tempCanvas.height = video.videoHeight;
+                    tempContext.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+
+                    // Convert the canvas content to a JPEG blob (image file data)
+                    tempCanvas.toBlob(sendFrameToAPI, 'image/jpeg', 0.9);
+                }
+            }, FRAME_INTERVAL_MS);
+        }
+
+        /** Sends a single image blob to the FastAPI endpoint. */
+        function sendFrameToAPI(blob) {
+            if (!blob) return;
+
+            const formData = new FormData();
+            formData.append("file", blob, "frame.jpg");
+
+            fetch(API_URL, {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => {
+                if (!response.status === 500) {
+                    throw new Error(`API returned non-OK status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    // Store the emotion result
+                    allPredictions.push(data.emotion);
+                    statusText.textContent = `Status: Analyzing... Latest Emotion: ${data.emotion} (${allPredictions.length} frames collected)`;
+                } else if (data.status === 'no_face_detected') {
+                    statusText.textContent = "Status: Analyzing... No face detected in frame. Adjust view.";
+                }
+            })
+            .catch(error => {
+                console.error('API/Network Error:', error);
+                statusText.textContent = "⚠️ Error: Failed to connect to API or request failed. Check server status.";
+                clearInterval(intervalId); // Stop the loop on API failure
+            });
+        }
+
+        /** Stops the webcam, analysis, and calculates the final summary. */
+        function stopAnalysis() {
+            clearInterval(intervalId);
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            video.srcObject = null;
+            
+            startButton.disabled = false;
+            stopButton.disabled = true;
+
+            if (allPredictions.length < 5) { 
+                statusText.textContent = `Analysis stopped. Only collected ${allPredictions.length} frames. Not enough data for a meaningful summary.`;
+                resultSummary.style.display = 'none';
+                return;
+            }
+
+            statusText.textContent = `✅ Analysis complete! Collected ${allPredictions.length} frames over ${(allPredictions.length * FRAME_INTERVAL_MS / 1000).toFixed(1)} seconds.`;
+            generateSummary(allPredictions);
+        }
+
+        /** Generates the final chart and textual feedback. */
+        function generateSummary(predictions) {
+            const emotionCounts = predictions.reduce((acc, emotion) => {
+                acc[emotion] = (acc[emotion] || 0) + 1;
+                return acc;
+            }, {});
+
+            const total = predictions.length;
+            const allLabels = ['Happy', 'Neutral', 'Fear', 'Sad', 'Angry', 'Surprise', 'Disgust'];
+            const sortedCounts = {};
+            
+            // Populate counts, ensuring labels with zero count are included
+            allLabels.forEach(label => {
+                sortedCounts[label] = (emotionCounts[label] || 0);
+            });
+
+            const emotions = Object.keys(sortedCounts);
+            const percentages = emotions.map(e => (sortedCounts[e] / total) * 100);
+
+            // --- Chart Generation ---
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+            
+            chartInstance = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: emotions,
+                    datasets: [{
+                        label: 'Percentage (%) of Total Frames',
+                        data: percentages,
+                        backgroundColor: [
+                            '#4CAF50', '#2196F3', '#FFC107', '#9E9E9E', '#F44336', '#FF9800', '#607D8B'
+                        ],
+                        borderColor: '#333',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: { display: true, text: 'Percentage (%)' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            // --- Feedback Generation ---
+            let feedback = "--- Detailed Distribution ---\n";
+            emotions.forEach((e, i) => {
+                feedback += `${e.padEnd(8)}: ${percentages[i].toFixed(1).padStart(4)}%\n`;
+            });
+
+            feedback += "\n--- Behavioral Tips ---\n";
+            
+            const happyPct = sortedCounts['Happy'] / total * 100;
+            const fearPct = sortedCounts['Fear'] / total * 100;
+            const neutralPct = sortedCounts['Neutral'] / total * 100;
+            const negativePct = (sortedCounts['Sad'] + sortedCounts['Angry']) / total * 100;
+
+            if (happyPct < 15) {
+                feedback += "✅ Tip: Your 'Happy' score is low. Try to smile more and show genuine enthusiasm for the role.\n";
+            }
+            if (fearPct > 10) {
+                feedback += "⚠ Tip: High 'Fear' suggests anxiety. Practice relaxation techniques and be even more prepared for challenging questions.\n";
+            }
+            if (neutralPct > 65) {
+                feedback += "💡 Tip: High 'Neutrality' is great for composure, but ensure your answers are dynamic and not monotone.\n";
+            }
+            if (negativePct > 5) {
+                feedback += "🛑 Warning: Small amounts of 'Sad' or 'Angry' emotions can signal frustration. Be mindful of maintaining a positive non-verbal presence.\n";
+            }
+            if (happyPct + neutralPct < 70) {
+                feedback += "⭐ Overall: Aim to increase your 'Happy' and 'Neutral' percentage to project confidence and positive energy.\n";
+            }
+
+            feedbackText.textContent = feedback;
+            resultSummary.style.display = 'block';
+        }
+
+
+        // Event Listeners
+        startButton.addEventListener('click', startWebcam);
+        stopButton.addEventListener('click', stopAnalysis);
+    </script>
+</body>
+</html>
