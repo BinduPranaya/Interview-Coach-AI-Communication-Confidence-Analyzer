@@ -1,0 +1,17 @@
+# --- Core Application Dependencies ---
+fastapi>=0.120.1 
+uvicorn>=0.38.0 
+opencv-python>=4.9.0.80 # Core image processing and Haar Cascades
+numpy>=1.26.4 # OpenCV's fundamental array handling dependency
+
+# --- FastAPI and Starlette Dependencies ---
+starlette>=0.48.0
+pydantic>=2.12.3 # Data validation/serialization
+pydantic-core>=2.41.4
+python-multipart>=0.0.20 # Required for handling File/UploadFile objects
+typing-extensions>=4.15.0
+
+# --- HTTP/Networking (Used by FastAPI/Dependencies) ---
+httpcore>=1.0.9
+httpx>=0.28.1
+h11>=0.16.0
