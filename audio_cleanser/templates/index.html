@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Cleaner</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Audio Cleaner Web App</h2>
+        <p>Upload a WAV file to clean and normalize it.</p>
+
+        <form action="/" method="POST" enctype="multipart/form-data">
+            <input type="file" name="audio_file" accept=".wav">
+            <button type="submit">Upload & Clean</button>
+        </form>
+
+        {% if original_file %}
+        <h3>Original Audio:</h3>
+        <audio controls>
+            <source src="/static/uploads/{{ original_file }}" type="audio/wav">
+        </audio>
+        {% endif %}
+
+        {% if cleaned_file %}
+        <div class="success-box">
+            <p>✅ File cleaned successfully!</p>
+            <h3>Cleaned Audio:</h3>
+            <audio controls>
+                <source src="/download/{{ cleaned_file }}" type="audio/wav">
+            </audio>
+            <br>
+            <a class="download-btn" href="/download/{{ cleaned_file }}">Download Cleaned File</a>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
