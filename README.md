@@ -9,3 +9,10 @@ A smart AI interviewer that evaluates not only your answers but also your tone, 
 `http://localhost:5001` → TTS
 
 `http://localhost:8002` → LLM
+
+
+
+Emotion detection host:
+https://emotion-detection-8lmy.onrender.com
+
+speech to text
