@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+requests
+streamlit
+groq
+gunicorn
+python-dotenv

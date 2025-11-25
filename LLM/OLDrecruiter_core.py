@@ -1,12 +1,23 @@
-import ollama
+#recuiter_core.py
+from groq import Groq
 import json
 from typing import List, Dict, Any
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
+
+#------------------groq API key support-----------------
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+
+#--------API key testing--------
+# print("Groq key loaded:", os.getenv("GROQ_API_KEY"))
 
 # --- Configuration ---
 CONFIG = {
-    'MODEL_NAME': 'llama3.1',
+    'MODEL_NAME': 'llama-3.1-8b-instant',
     # NOTE: This host MUST be running the Ollama server for the code to function.
-    'OLLAMA_HOST': 'http://localhost:11434',
+    'OLLAMA_HOST': os.getenv("OLLAMA_HOST", "http://localhost:11434"),
 }
 
 SYSTEM_PROMPT = """
@@ -33,44 +44,70 @@ class AIRecruiter:
     Manages the state and conversation flow for a mock technical interview 
     using a local Ollama LLM service.
     """
-    def __init__(self, host: str = CONFIG['OLLAMA_HOST'], model: str = CONFIG['MODEL_NAME']):
-        """
-        Initializes the Ollama client and sets up the conversation history.
+    # def __init__(self, host: str = CONFIG['OLLAMA_HOST'], model: str = CONFIG['MODEL_NAME']):
+    #     """
+    #     Initializes the Ollama client and sets up the conversation history.
 
-        Args:
-            host: The URL for the Ollama server (e.g., 'http://localhost:11434').
-            model: The name of the model to use (e.g., 'llama3.1').
-        """
-        self.host = host
+    #     Args:
+    #         host: The URL for the Ollama server (e.g., 'http://localhost:11434').
+    #         model: The name of the model to use (e.g., 'llama3.1').
+    #     """
+    #     # self.host = host
+    #     # self.model = model
+    #     # self.client = ollama.Client(host=self.host)
+
+
+    #     # Initialize conversation with the strict system instruction
+    #     self.conversation_history: List[Dict[str, str]] = [
+    #         {"role": "system", "content": SYSTEM_PROMPT}
+    #     ]
+    #     print(f"--- AIRecruiter Initialized (Host: {self.host}, Model: {self.model}) ---")
+
+    def __init__(self, host: str = None, model: str = "llama-3.1-8b-instant"):
         self.model = model
-        self.client = ollama.Client(host=self.host)
-        # Initialize conversation with the strict system instruction
-        self.conversation_history: List[Dict[str, str]] = [
+        self.client = Groq(api_key=GROQ_API_KEY)
+        self.conversation_history = [
             {"role": "system", "content": SYSTEM_PROMPT}
         ]
-        print(f"--- AIRecruiter Initialized (Host: {self.host}, Model: {self.model}) ---")
+
 
     def _get_response(self) -> str:
-        """
-        Private method to safely call the Ollama chat API and extract the response.
-        Handles connection and API errors.
-        """
         try:
-            response = self.client.chat(model=self.model, messages=self.conversation_history)
-            
-            # Check if the response structure is valid and extract the content
-            interviewer_reply = response.get('message', {}).get('content')
-            if interviewer_reply:
-                self.conversation_history.append({"role": "assistant", "content": interviewer_reply})
-                return interviewer_reply
-            else:
-                return "Error: Received an empty or malformed response from the LLM."
-                
-        except ollama.exceptions.RequestError as e:
-            # Handle connection errors, model not found, etc.
-            return f"Error connecting to Ollama or processing request: {e}. Please ensure Ollama is running at {self.host} and the model '{self.model}' is downloaded."
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=self.conversation_history
+            )
+            reply = response.choices[0].message["content"]
+            self.conversation_history.append({"role": "assistant", "content": reply})
+            return reply
         except Exception as e:
-            return f"An unexpected error occurred during the API call: {e}"
+            return f"Error calling Groq API: {e}"
+
+    
+    # def _get_response(self) -> str:
+    #     """
+    #     Private method to safely call the Ollama chat API and extract the response.
+    #     Handles connection and API errors.
+    #     """
+    #     try:
+    #         response = self.client.chat(model=self.model, messages=self.conversation_history)
+            
+    #         # Check if the response structure is valid and extract the content
+    #         interviewer_reply = response.get('message', {}).get('content')
+    #         if interviewer_reply:
+    #             self.conversation_history.append({"role": "assistant", "content": interviewer_reply})
+    #             return interviewer_reply
+    #         else:
+    #             return "Error: Received an empty or malformed response from the LLM."
+                
+    #     except ollama.exceptions.RequestError as e:
+    #         # Handle connection errors, model not found, etc.
+    #         return f"Error connecting to Ollama or processing request: {e}. Please ensure Ollama is running at {self.host} and the model '{self.model}' is downloaded."
+    #     except Exception as e:
+    #         return f"An unexpected error occurred during the API call: {e}"
+
+
+
 
     def start_interview(self, role: str) -> str:
         """
@@ -86,6 +123,7 @@ class AIRecruiter:
         self.conversation_history.append({"role": "user", "content": user_prompt})
 
         return self._get_response()
+    
 
     def continue_interview(self, candidate_reply: str) -> str:
         """

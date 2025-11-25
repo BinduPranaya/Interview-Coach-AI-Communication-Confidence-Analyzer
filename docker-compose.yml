@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  emotion:
+    build: ./EMOTION_DETECTION
+    container_name: emotion_service
+    ports:                            #done
+      - "8000:8000"
+
+  stt:
+    build: ./Speech_to_Text
+    container_name: stt_service
+    ports:                            #done
+      - "8001:8001"
+
+  tts:
+    build: ./text_to_speech
+    container_name: tts_service
+    ports:                            #done
+      - "5001:5001"
+
+  llm_api:
+    build:
+      context: ./LLM
+      dockerfile: Dockerfile
+    container_name: llm_api_service
+    ports:
+      - "8002:8002"
+    environment:
+      OLLAMA_HOST: "http://host.docker.internal:11434"
+
+  llm_ui:
+    build:
+      context: ./LLM
+      dockerfile: Dockerfile-streamlit
+    container_name: llm_ui_service
+    ports:
+      - "8501:8501"

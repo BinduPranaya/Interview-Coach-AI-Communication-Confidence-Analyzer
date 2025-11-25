@@ -1,2 +1,6 @@
 Flask
 pyttsx3
+fastapi
+uvicorn
+pydub
+TTS

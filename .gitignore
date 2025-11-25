@@ -9,3 +9,36 @@ EMOTION_DETECTION.zip
 Speech_to_Text
 EMOTION_DETECTION MODEL_files
 architecture
+
+
+# Virtual environment
+venv/
+**/venv/
+ENV/
+env/
+
+# Python cache files
+__pycache__/
+**/__pycache__/
+
+# Environment variables (never upload)
+.env
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Model / large binary files you don't want on GitHub
+*.zip
+*.doc
+*.docx
+*.pdf
+
+*.pyc
+
+
+# Folders you marked as non-code assets or heavy data
+EMOTION_DETECTION/
+EMOTION_DETECTION MODEL_files/
+Speech_to_Text/
+architecture/
