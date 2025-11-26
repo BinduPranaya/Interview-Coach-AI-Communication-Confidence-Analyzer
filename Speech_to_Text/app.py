@@ -153,7 +153,8 @@ async def analyze_audio(file: UploadFile = File(...)):
     # FIX: Use NamedTemporaryFile(delete=False) and manually clean up
     # This prevents the file from being deleted immediately after the handle is closed, 
     # ensuring Whisper/Librosa can access it.
-    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file.filename)
+    # tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file.filename)
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
     tmp_path = tmp_file.name
     
     try:
