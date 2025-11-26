@@ -4,3 +4,4 @@ pydantic==2.5.0
 openai-whisper==20231117
 librosa==0.10.1
 python-multipart==0.0.6
+gunicorn
