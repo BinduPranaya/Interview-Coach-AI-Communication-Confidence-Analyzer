@@ -9,6 +9,8 @@ from pydantic import BaseModel
 import uvicorn
 import librosa
 from fastapi.middleware.cors import CORSMiddleware # NEW IMPORT
+import soundfile as sf
+
 
 # ✅ Use official OpenAI Whisper
 import whisper
@@ -41,7 +43,7 @@ app.add_middleware(
 
 # ✅ Load Whisper model globally
 try:
-    model = whisper.load_model("base")
+    model = whisper.load_model("tiny", device="cpu")
     logging.info("✅ Whisper 'base' model loaded successfully.")
 except Exception as e:
     logging.error(f"❌ Failed to load Whisper model: {e}")
@@ -106,21 +108,33 @@ def tone_analyzer(text: str) -> ToneAnalysis:
     return ToneAnalysis(tone=tone, positive_score=pos_score, negative_score=neg_score)
 
 
-def pace_calculator(audio_path: str, text: str) -> Union[PaceAnalysis, Dict]:
-    """Calculates speech pace (Words Per Minute)."""
+# def pace_calculator(audio_path: str, text: str) -> Union[PaceAnalysis, Dict]:
+#     """Calculates speech pace (Words Per Minute)."""
+#     try:
+#         duration = librosa.get_duration(path=audio_path)
+#         words = len(text.split())
+#         pace_wpm = round(words / (duration / 60), 2) if duration > 0 else 0
+
+#         return PaceAnalysis(
+#             duration_sec=round(duration, 2),
+#             words=words,
+#             pace_wpm=pace_wpm
+#         )
+#     except Exception as e:
+#         logging.error(f"Pace calculation failed: {e}")
+#         return {"error": str(e)}
+
+def pace_calculator(audio_path: str, text: str):
     try:
-        duration = librosa.get_duration(path=audio_path)
+        audio, sr = sf.read(audio_path)
+        duration = len(audio) / sr
         words = len(text.split())
         pace_wpm = round(words / (duration / 60), 2) if duration > 0 else 0
-
-        return PaceAnalysis(
-            duration_sec=round(duration, 2),
-            words=words,
-            pace_wpm=pace_wpm
-        )
+        return PaceAnalysis(duration_sec=round(duration, 2), words=words, pace_wpm=pace_wpm)
     except Exception as e:
         logging.error(f"Pace calculation failed: {e}")
         return {"error": str(e)}
+
 
 
 # --- 4. API ENDPOINTS ---
@@ -182,4 +196,6 @@ async def analyze_audio(file: UploadFile = File(...)):
 # --- 5. ENTRY POINT ---
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="127.0.0.1", port=8080, reload=True)
+    # uvicorn.run("app:app", host="127.0.0.1", port=8080, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
+
