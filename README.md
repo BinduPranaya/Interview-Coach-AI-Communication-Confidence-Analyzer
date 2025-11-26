@@ -16,3 +16,7 @@ Emotion detection host:
 https://emotion-detection-8lmy.onrender.com
 
 speech to text
+
+
+text to speech host:
+https://text-to-speech-9gx3.onrender.com

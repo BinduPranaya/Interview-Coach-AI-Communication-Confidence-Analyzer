@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎤 Real-Time Speech to Text Analyzer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-6">
+  <div class="bg-white shadow-lg rounded-2xl p-8 w-full max-w-2xl">
+    <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">
+      🎙️ Interview Coach - Real-Time Speech Analyzer
+    </h1>
+
+    <div class="flex flex-col items-center space-y-6">
+      <!-- Record Button -->
+      <button
+        id="record-btn"
+        class="px-8 py-3 text-white bg-blue-600 rounded-full hover:bg-blue-700 transition font-semibold shadow-md"
+      >
+        🎤 Start Recording
+      </button>
+
+      <!-- Recording Indicator -->
+      <div id="recording-status" class="text-red-600 font-semibold hidden">
+        🔴 Recording in progress...
+      </div>
+
+      <!-- Loading Spinner -->
+      <div id="loading" class="hidden text-blue-600 text-center">
+        <div
+          class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent text-blue-600"
+        ></div>
+        <p class="mt-2">Analyzing your speech...</p>
+      </div>
+
+      <!-- Error Message -->
+      <p
+        id="error-message"
+        class="hidden bg-red-100 text-red-700 text-sm p-3 rounded-md border border-red-300"
+      ></p>
+
+      <!-- Results -->
+      <div id="results" class="hidden w-full mt-6 space-y-4">
+        <h2 class="text-xl font-semibold text-gray-700 text-center">
+          🧠 Analysis Report
+        </h2>
+
+        <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+          <h3 class="text-lg font-semibold text-gray-800">Transcription:</h3>
+          <p id="transcription" class="text-gray-700 italic mt-1"></p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="p-4 bg-white shadow rounded-lg border-t-4 border-blue-500">
+            <h4 class="font-semibold text-gray-600">Pace</h4>
+            <p id="pace" class="text-blue-600 font-bold text-2xl">--</p>
+          </div>
+
+          <div class="p-4 bg-white shadow rounded-lg border-t-4 border-yellow-500">
+            <h4 class="font-semibold text-gray-600">Fillers</h4>
+            <p id="fillers" class="text-yellow-600 font-bold text-2xl">--</p>
+          </div>
+
+          <div class="p-4 bg-white shadow rounded-lg border-t-4 border-green-500">
+            <h4 class="font-semibold text-gray-600">Tone</h4>
+            <p id="tone" class="text-green-600 font-bold text-2xl">--</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "http://127.0.0.1:8080/analyze";
+    const recordBtn = document.getElementById("record-btn");
+    const recordingStatus = document.getElementById("recording-status");
+    const loadingDiv = document.getElementById("loading");
+    const resultsDiv = document.getElementById("results");
+    const errorDiv = document.getElementById("error-message");
+
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+
+    recordBtn.addEventListener("click", async () => {
+      if (!isRecording) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream);
+          audioChunks = [];
+
+          mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+            await sendAudioToAPI(audioBlob);
+          };
+
+          mediaRecorder.start();
+          isRecording = true;
+          recordBtn.textContent = "⏹ Stop Recording";
+          recordingStatus.classList.remove("hidden");
+        } catch (err) {
+          showError("Microphone access denied or unavailable.");
+        }
+      } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        recordBtn.textContent = "🎤 Start Recording";
+        recordingStatus.classList.add("hidden");
+      }
+    });
+
+    async function sendAudioToAPI(audioBlob) {
+      const formData = new FormData();
+      formData.append("file", audioBlob, "recording.webm");
+
+      loadingDiv.classList.remove("hidden");
+      resultsDiv.classList.add("hidden");
+      errorDiv.classList.add("hidden");
+
+      try {
+        const response = await fetch(API_URL, { method: "POST", body: formData });
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.detail || "Server error");
+        }
+
+        const data = await response.json();
+        displayResults(data);
+      } catch (err) {
+        showError("Error: " + err.message);
+      } finally {
+        loadingDiv.classList.add("hidden");
+      }
+    }
+
+    function displayResults(data) {
+      document.getElementById("transcription").textContent = data.transcription || "No text found.";
+      document.getElementById("fillers").textContent = data.filler_analysis.filler_count;
+      document.getElementById("tone").textContent = data.tone_analysis.tone;
+      document.getElementById("pace").textContent = data.pace_analysis.pace_wpm + " WPM";
+      resultsDiv.classList.remove("hidden");
+    }
+
+    function showError(message) {
+      errorDiv.textContent = message;
+      errorDiv.classList.remove("hidden");
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-multipart
+openai-whisper
+torch
+librosa
+soundfile
+numpy
+pydantic
+#modules to be imported

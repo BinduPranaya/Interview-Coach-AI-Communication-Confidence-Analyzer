@@ -7,3 +7,5 @@ streamlit
 groq
 gunicorn
 python-dotenv
+
+#updated requirements
