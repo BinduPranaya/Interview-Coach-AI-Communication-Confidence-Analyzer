@@ -1,43 +1,36 @@
-venv
-EMOTION_DETECTION/__pycache__
-.env
-architecture.zip
-EMOTION_DETECTION MODEL.doc
-LLM.doc
-LLM.zip
-EMOTION_DETECTION.zip
-EMOTION_DETECTION MODEL_files
-architecture
-
-
-# Virtual environment
+# ==== ENVIRONMENTS ====
 venv/
 **/venv/
-ENV/
 env/
+ENV/
 
-# Python cache files
+# ==== PYTHON CACHE ====
 __pycache__/
 **/__pycache__/
+*.pyc
 
-# Environment variables (never upload)
+# ==== ENV FILES ====
 .env
 
-# OS-generated files
+# ==== OS FILES ====
 .DS_Store
 Thumbs.db
 
-# Model / large binary files you don't want on GitHub
+# ==== LARGE / NON-CODE FILES ====
 *.zip
 *.doc
 *.docx
 *.pdf
 
-*.pyc
+# ==== TEMP / GENERATED AUDIO ====
+text_to_speech/data/
+text_to_speech/generated_audio/
+Speech_to_Text/sample-*.mp3
 
+# ==== PROJECT-SPECIFIC: IGNORE ONLY WHAT'S NECESSARY ====
+EMOTION_DETECTION/MODEL/
+EMOTION_DETECTION/architecture/
+EMOTION_DETECTION/EMOTION_DETECTION\ MODEL_files/
 
-# Folders you marked as non-code assets or heavy data
-EMOTION_DETECTION/
-EMOTION_DETECTION MODEL_files/
-Speech_to_Text/
-architecture/
+# Optional temp file
+tempCodeRunnerFile.py
