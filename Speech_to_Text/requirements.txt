@@ -7,4 +7,6 @@ librosa
 soundfile
 numpy
 pydantic
+soundfile
+
 #modules to be imported

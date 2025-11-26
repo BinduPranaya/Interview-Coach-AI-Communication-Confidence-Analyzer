@@ -7,17 +7,20 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 import uvicorn
-import librosa
+# import librosa
 from fastapi.middleware.cors import CORSMiddleware # NEW IMPORT
 import soundfile as sf
 
 
 # ✅ Use official OpenAI Whisper
-import whisper
-
+# import whisper    --> taking too much ram on render and crashed
+from openai import OpenAI
 # --- 1. CONFIGURATION AND INITIALIZATION -----
-
+client = OpenAI()
 logging.basicConfig(level=logging.INFO)
+if not client.api_key:
+    raise RuntimeError("OpenAI API key is missing.")
+
 
 FILLERS = ["um", "uh", "like", "you know", "so", "actually", "basically"]
 POSITIVE_WORDS = ["good", "great", "amazing", "happy", "love", "excellent", "strong", "positive", "best"]
@@ -42,12 +45,12 @@ app.add_middleware(
 # -----------------------------------
 
 # ✅ Load Whisper model globally
-try:
-    model = whisper.load_model("tiny", device="cpu")
-    logging.info("✅ Whisper 'base' model loaded successfully.")
-except Exception as e:
-    logging.error(f"❌ Failed to load Whisper model: {e}")
-    model = None
+# try:
+#     model = whisper.load_model("tiny", device="cpu")   --> taking too much ram on render and crashed
+#     logging.info("✅ Whisper 'base' model loaded successfully.")
+# except Exception as e:
+#     logging.error(f"❌ Failed to load Whisper model: {e}")
+#     model = None
 
 
 # --- 2. Pydantic Models ---
@@ -75,14 +78,26 @@ class AnalysisResponse(BaseModel):
 
 # --- 3. CORE FUNCTIONS ---
 
-def speech_to_text(audio_path: str) -> str:
-    """Transcribes audio using the Whisper model."""
-    if not model:
-        raise RuntimeError("Whisper model is not loaded properly.")
+# def speech_to_text(audio_path: str) -> str:
+#     """Transcribes audio using the Whisper model."""
+#     # if not model:
+#     #     raise RuntimeError("Whisper model is not loaded properly.")
 
-    # Using fp16=False for stability, especially on CPUs or older GPUs
-    result = model.transcribe(audio_path, fp16=False)
-    return result.get("text", "").strip()
+#     # Using fp16=False for stability, especially on CPUs or older GPUs
+#     result = model.transcribe(audio_path, fp16=False)
+#     return result.get("text", "").strip()
+
+def speech_to_text(audio_path: str) -> str:
+    """Transcribes audio using OpenAI Whisper API instead of local model."""
+    with open(audio_path, "rb") as f:
+        audio_bytes = f.read()
+
+    result = client.audio.transcriptions.create(
+        model="whisper-1",
+        file=("audio.wav", audio_bytes)
+    )
+
+    return result.text.strip()
 
 
 def filler_detector(text: str) -> FillerAnalysis:
@@ -147,14 +162,15 @@ async def redirect_to_docs():
 @app.post("/analyze", response_model=AnalysisResponse)
 async def analyze_audio(file: UploadFile = File(...)):
     """Main Speech-to-Text and Communication Analyzer."""
-    if not model:
-        raise HTTPException(status_code=503, detail="Whisper model not available on the server.")
+    # if not model:
+    #     raise HTTPException(status_code=503, detail="Whisper model not available on the server.")
 
     # FIX: Use NamedTemporaryFile(delete=False) and manually clean up
     # This prevents the file from being deleted immediately after the handle is closed, 
     # ensuring Whisper/Librosa can access it.
     # tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=file.filename)
-    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+    ext = os.path.splitext(file.filename)[1] or ".wav"
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
     tmp_path = tmp_file.name
     
     try:
