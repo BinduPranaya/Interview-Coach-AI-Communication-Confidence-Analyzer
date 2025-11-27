@@ -3,3 +3,4 @@ livekit-plugins-groq
 python-dotenv
 Fastapi
 gunicorn
+uvicorn
