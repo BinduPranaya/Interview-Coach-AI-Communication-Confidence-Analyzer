@@ -20,3 +20,9 @@ speech to text
 
 text to speech host:
 https://text-to-speech-9gx3.onrender.com
+
+LLM Backend
+https://llm-backend-9e79.onrender.com
+
+LLM UI
+https://llm-ui-me2a.onrender.com
