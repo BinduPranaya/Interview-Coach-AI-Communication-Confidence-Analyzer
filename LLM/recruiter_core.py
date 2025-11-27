@@ -1,4 +1,4 @@
-# recruiter_core.py
+#LLM recruiter_core.py
 from groq import Groq
 import os
 from typing import List, Dict
