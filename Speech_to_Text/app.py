@@ -215,5 +215,9 @@ async def analyze_audio(file: UploadFile = File(...)):
 
 if __name__ == "__main__":
     # uvicorn.run("app:app", host="127.0.0.1", port=8080, reload=True)
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
+     uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 8080))
+    )
 
